@@ -1,0 +1,22 @@
+{
+  "name": "smart-emergency-routing",
+  "version": "0.1.0",
+  "description": "Smart Emergency Communication Routing using Dijkstra's Shortest Path Algorithm",
+  "type": "module",
+  "main": "src/algorithm/index.js",
+  "scripts": {
+    "start": "echo \"Frontend not scaffolded yet\" && exit 1",
+    "test": "node --experimental-vm-modules node_modules/.bin/jest"
+  },
+  "keywords": [
+    "dijkstra",
+    "shortest-path",
+    "emergency-routing",
+    "graph-algorithms"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "jest": "^29.0.0"
+  }
+}

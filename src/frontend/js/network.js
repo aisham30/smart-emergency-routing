@@ -1,21 +1,18 @@
 /**
  * network.js — Frontend Graph Data Layer
  *
- * Mirrors data/network.js and augments it with:
- *   • Node metadata  (type, display label, accent colour, SVG canvas position)
- *   • Pre-computed shortest-path routes for all node pairs (mock data)
- *   • getMockRoute() — drop-in stub ready for Dijkstra integration
+ * Provides:
+ *   • GRAPH       — adjacency list (mirrors data/network.js exactly)
+ *   • NODE_TYPES  — visual styling per node type
+ *   • NODE_INFO   — per-node metadata + SVG canvas positions
+ *   • EDGES       — deduplicated edge list derived from GRAPH
+ *   • getRoute()  — adapter calling Deon's findShortestPath
  *
- * ── INTEGRATION POINT (Deon) ─────────────────────────────────────────────────
- * Once src/algorithm/ is ready, replace getMockRoute() with:
- *
- *   import { dijkstra } from '../../algorithm/index.js';
- *   export function getRoute(src, dst) {
- *     const r = dijkstra(GRAPH, src, dst);
- *     return r ? { path: r.path, cost: r.cost, hops: r.path.length - 1 } : null;
- *   }
- * ─────────────────────────────────────────────────────────────────────────────
+ * Author: Aisha (Frontend Module)
+ * Integration: Deon (Algorithm), Alston (Simulation)
  */
+
+import { findShortestPath } from '../../algorithm/index.js';
 
 // ─── Adjacency list (source of truth: data/network.js) ───────────────────────
 export const GRAPH = {
@@ -65,67 +62,25 @@ export const EDGES = (() => {
   return list;
 })();
 
-// ─── Pre-computed shortest paths (all distinct pairs) ────────────────────────
-// Verified manually against Dijkstra; serves as ground-truth test data too.
-const ROUTES = {
-  // From CC
-  'CC·N1': { path: ['CC','N1'],              cost: 5  },
-  'CC·F1': { path: ['CC','F1'],              cost: 8  },
-  'CC·P1': { path: ['CC','P1'],              cost: 12 },
-  'CC·H1': { path: ['CC','N1','H1'],         cost: 12 },
-  'CC·H2': { path: ['CC','N1','H2'],         cost: 15 },
-  'CC·R1': { path: ['CC','N1','R1'],         cost: 17 },
-  'CC·R2': { path: ['CC','P1','R2'],         cost: 20 },
-  // From N1
-  'N1·F1': { path: ['N1','H1','F1'],         cost: 13 },
-  'N1·P1': { path: ['N1','CC','P1'],         cost: 17 },
-  'N1·H1': { path: ['N1','H1'],             cost: 7  },
-  'N1·H2': { path: ['N1','H2'],             cost: 10 },
-  'N1·R1': { path: ['N1','R1'],             cost: 12 },
-  'N1·R2': { path: ['N1','R1','R2'],         cost: 16 },
-  // From F1
-  'F1·P1': { path: ['F1','P1'],             cost: 7  },
-  'F1·H1': { path: ['F1','H1'],             cost: 6  },
-  'F1·H2': { path: ['F1','H1','H2'],         cost: 11 },
-  'F1·R1': { path: ['F1','H1','H2','R1'],    cost: 17 },
-  'F1·R2': { path: ['F1','P1','R2'],         cost: 15 },
-  // From P1
-  'P1·H1': { path: ['P1','F1','H1'],         cost: 13 },
-  'P1·H2': { path: ['P1','F1','H1','H2'],    cost: 18 },
-  'P1·R1': { path: ['P1','R2','R1'],         cost: 12 },
-  'P1·R2': { path: ['P1','R2'],             cost: 8  },
-  // From H1
-  'H1·H2': { path: ['H1','H2'],             cost: 5  },
-  'H1·R1': { path: ['H1','H2','R1'],         cost: 11 },
-  'H1·R2': { path: ['H1','H2','R1','R2'],    cost: 15 },
-  // From H2
-  'H2·R1': { path: ['H2','R1'],             cost: 6  },
-  'H2·R2': { path: ['H2','R1','R2'],         cost: 10 },
-  // From R1
-  'R1·R2': { path: ['R1','R2'],             cost: 4  },
-};
-
 /**
- * getMockRoute(source, destination) → { path, cost, hops } | null
+ * getRoute(graph, source, destination)
+ *   Calls Deon's findShortestPath and maps the result to the shape the
+ *   frontend UI expects: { path, cost, hops }.
  *
- * Returns the pre-computed shortest path between any two nodes.
- * Handles both forward and reverse direction automatically.
+ *   Pass the CURRENT graph (from NetworkSimulator.getGraph()) so that
+ *   failure scenarios use the live topology rather than the base graph.
  *
- * ── INTEGRATION POINT ────────────────────────────────────────────────────────
- * Replace this function body with the real algorithm call once ready:
- *   return dijkstra(GRAPH, source, destination);
- * ─────────────────────────────────────────────────────────────────────────────
+ * @param {Object} graph       — adjacency list (base or post-failure)
+ * @param {string} source      — origin node id
+ * @param {string} destination — target node id
+ * @returns {{ path: string[], cost: number, hops: number } | null}
  */
-export function getMockRoute(source, destination) {
-  if (source === destination) return { path: [source], cost: 0, hops: 0 };
-
-  // Try both orderings — ROUTES keys are not always alphabetically sorted,
-  // so we check src·dst first then fall back to dst·src with path reversed.
-  const entryFwd = ROUTES[`${source}·${destination}`];
-  if (entryFwd) return { path: [...entryFwd.path], cost: entryFwd.cost, hops: entryFwd.path.length - 1 };
-
-  const entryRev = ROUTES[`${destination}·${source}`];
-  if (entryRev) return { path: [...entryRev.path].reverse(), cost: entryRev.cost, hops: entryRev.path.length - 1 };
-
-  return null;   // unroutable pair (should not occur within this 8-node graph)
+export function getRoute(graph, source, destination) {
+  const result = findShortestPath(graph, source, destination);
+  if (!result || result.status === 'unreachable') return null;
+  return {
+    path:  result.path,
+    cost:  result.totalDelay,        // maps totalDelay → cost for UI layer
+    hops:  result.path.length - 1,
+  };
 }

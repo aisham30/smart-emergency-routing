@@ -1,26 +1,26 @@
 # Frontend — Emergency Control Dashboard
 
-> **Module owner:** Frontend Team  
+> **Module owner:** Aisha (Frontend Team)
 > **Branch:** `feature/frontend`
 
-Interactive browser dashboard for the Smart Emergency Communication Routing project.  
-Uses **mock route data** today; ready to drop in the real Dijkstra module with a one-line change.
+Interactive browser dashboard for the Smart Emergency Communication Routing project.
+All three modules are now fully integrated — real Dijkstra routing, live graph state, and failure simulation.
 
 ---
 
 ## Running
 
-ES modules require a local HTTP server (browsers block `file://` imports).
+Serve from the **repo root** (so cross-module browser imports resolve correctly):
 
 ```bash
-# From repo root — Python 3
-python3 -m http.server 8080 --directory src/frontend
+# Python 3 (from repo root)
+python3 -m http.server 8080
 
-# OR with Node
-npx serve src/frontend
+# OR Node
+npx serve .
 
 # Then open
-open http://localhost:8080
+open http://localhost:8080/src/frontend/
 ```
 
 ---
@@ -33,53 +33,59 @@ src/frontend/
 ├── css/
 │   └── styles.css      # Dark ops-center theme (CSS custom properties)
 └── js/
-    ├── app.js          # App controller — wires viz + UI, owns state
-    ├── network.js      # Graph data, node metadata, mock route table
+    ├── app.js          # App controller — wires algorithm + sim + UI
+    ├── network.js      # GRAPH constants + getRoute() adapter (real Dijkstra)
     ├── visualizer.js   # SVG renderer — edges, nodes, route animation
     └── ui.js           # DOM controller — panels, dropdowns, log
 ```
 
 ---
 
-## Integration Points
+## Integration (Live — no stubs remaining)
 
-### ① Dijkstra (Deon — `src/algorithm/`)
+### Algorithm (Deon — `src/algorithm/`)
 
-In [`js/network.js`](js/network.js), replace `getMockRoute()`:
+`network.js` imports `findShortestPath` directly:
 
 ```js
-// Before (mock)
-export function getMockRoute(source, destination) { … }
+import { findShortestPath } from '../../algorithm/index.js';
 
-// After (real Dijkstra)
-import { dijkstra } from '../../algorithm/index.js';
-export function getRoute(src, dst) {
-  const r = dijkstra(GRAPH, src, dst);
-  return r ? { path: r.path, cost: r.cost, hops: r.path.length - 1 } : null;
+export function getRoute(graph, source, destination) {
+  const result = findShortestPath(graph, source, destination);
+  if (!result || result.status === 'unreachable') return null;
+  return { path: result.path, cost: result.totalDelay, hops: result.path.length - 1 };
 }
 ```
 
-Then in [`js/app.js`](js/app.js), update the import and call:
+### Failure Simulation (Alston — `src/simulation/`)
+
+`app.js` creates a `NetworkSimulator`, wires Deon's router, and subscribes to failure events:
+
 ```js
-import { getRoute } from './network.js';   // one-line swap
-const route = getRoute(src, dst);
+import { findShortestPath } from '../../algorithm/index.js';
+import { NetworkSimulator }  from '../../simulation/index.js';
+
+this.sim = new NetworkSimulator(GRAPH);
+this.sim.setRouter(findShortestPath);
+
+this.sim.on('node-fail',    ({ nodeId }) => /* visual update + autoReroute */);
+this.sim.on('node-restore', ({ nodeId }) => /* visual restore */);
+this.sim.on('link-fail',    ({ u, v })   => /* visual + autoReroute */);
 ```
 
-### ② Failure Simulation (Alston — `src/simulation/`)
-
-[`js/app.js`](js/app.js) exposes two methods and a window event bus:
+Trigger failures from the browser console or externally:
 
 ```js
-// Method calls (if importing app.js directly)
-window._app.setNodeFailed('H1');   // mark node failed
-window._app.setNodeActive('H1');   // restore node
-
-// Event bus (preferred — keeps modules decoupled)
+// Via window event bus
 window.dispatchEvent(new CustomEvent('sim:node-fail',    { detail: 'H1' }));
 window.dispatchEvent(new CustomEvent('sim:node-restore', { detail: 'H1' }));
-```
+window.dispatchEvent(new CustomEvent('sim:link-fail',    { detail: { u: 'CC', v: 'N1' } }));
 
-The visualizer also has a standalone `setNodeState(id, state)` method and `animateMessage(path, cb)` for custom animation triggers.
+// Or directly via the exposed app instance
+window._app.setNodeFailed('H1');
+window._app.setLinkFailed('CC', 'N1');
+window._app.restoreAll();
+```
 
 ---
 
@@ -95,8 +101,9 @@ The visualizer also has a standalone `setNodeState(id, state)` method and `anima
 | Route stats (delay, hops, quality) | ✅ |
 | Emergency message send + dot animation | ✅ |
 | Transmission log | ✅ |
-| Node failure visual state | ✅ (visual only, no routing) |
+| Node failure visual state | ✅ |
 | Network status badge | ✅ |
 | Live clock | ✅ |
-| Dijkstra integration | ⬜ (stub ready) |
-| Live failure re-routing | ⬜ (event bus ready) |
+| Real Dijkstra routing | ✅ integrated |
+| Live failure re-routing (auto) | ✅ integrated |
+| Link failure visual + rerouting | ✅ integrated |

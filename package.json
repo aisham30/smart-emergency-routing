@@ -5,8 +5,13 @@
   "type": "module",
   "main": "src/algorithm/index.js",
   "scripts": {
-    "start": "echo \"Frontend not scaffolded yet\" && exit 1",
-    "test": "node --experimental-vm-modules node_modules/.bin/jest"
+    "start":        "python3 -m http.server 8080",
+    "test":         "node --test tests/simulation.test.js",
+    "test:algo":    "node src/algorithm/test-dijkstra.js",
+    "test:sim":     "node --test tests/simulation.test.js",
+    "test:int":     "node tests/integration.test.js",
+    "test:all":     "node src/algorithm/test-dijkstra.js && node --test tests/simulation.test.js && node tests/integration.test.js",
+    "demo":         "node src/simulation/demo.js"
   },
   "keywords": [
     "dijkstra",

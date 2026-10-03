@@ -1,20 +1,46 @@
-function findShortestPath(graph, source, destination) {
+/**
+ * dijkstra.js — Dijkstra's Shortest Path Algorithm
+ *
+ * Author: Deon (Algorithm Module)
+ * Branch: feature/dijkstra
+ *
+ * Contract
+ * ────────
+ *   findShortestPath(graph, source, destination)
+ *     graph       : adjacency list  { nodeId: { neighborId: weight, … }, … }
+ *     source      : string  —  origin node id
+ *     destination : string  —  target node id
+ *
+ *   Returns: { path: string[], totalDelay: number, status: 'reachable'|'unreachable' }
+ *
+ * Used by:
+ *   • src/algorithm/index.js  (public entry point)
+ *   • src/simulation/networkSimulator.js  (via setRouter())
+ *   • src/frontend/js/app.js  (via NetworkSimulator)
+ */
+
+/**
+ * Computes the shortest path between two nodes using Dijkstra's algorithm.
+ *
+ * @param {Object<string, Object<string, number>>} graph  Weighted adjacency list
+ * @param {string} source       Origin node id
+ * @param {string} destination  Target node id
+ * @returns {{ path: string[], totalDelay: number, status: 'reachable'|'unreachable' }}
+ */
+export function findShortestPath(graph, source, destination) {
   // Check whether source exists
   if (!graph[source]) {
-    return {
-      path: [],
-      totalDelay: Infinity,
-      status: "unreachable"
-    };
+    return { path: [], totalDelay: Infinity, status: 'unreachable' };
   }
 
   // Check whether destination exists
   if (!graph[destination]) {
-    return {
-      path: [],
-      totalDelay: Infinity,
-      status: "unreachable"
-    };
+    return { path: [], totalDelay: Infinity, status: 'unreachable' };
+  }
+
+  // Trivial case: source and destination are the same node
+  if (source === destination) {
+    return { path: [source], totalDelay: 0, status: 'reachable' };
   }
 
   // Distance from source to every node
@@ -67,9 +93,7 @@ function findShortestPath(graph, source, destination) {
       }
 
       const edgeWeight = graph[currentNode][neighbor];
-
-      const newDistance =
-        distances[currentNode] + edgeWeight;
+      const newDistance = distances[currentNode] + edgeWeight;
 
       // Found a shorter route
       if (newDistance < distances[neighbor]) {
@@ -81,11 +105,7 @@ function findShortestPath(graph, source, destination) {
 
   // Destination cannot be reached
   if (distances[destination] === Infinity) {
-    return {
-      path: [],
-      totalDelay: Infinity,
-      status: "unreachable"
-    };
+    return { path: [], totalDelay: Infinity, status: 'unreachable' };
   }
 
   // Reconstruct shortest path
@@ -100,10 +120,6 @@ function findShortestPath(graph, source, destination) {
   return {
     path,
     totalDelay: distances[destination],
-    status: "reachable"
+    status: 'reachable'
   };
 }
-
-module.exports = {
-  findShortestPath
-};

@@ -164,9 +164,10 @@ export class UIController {
         </div>
         <div class="r-stat r-stat--full">
           <span class="r-sl">DATA SOURCE</span>
-          <span class="r-sv mock-badge">MOCK · DIJKSTRA READY</span>
+          <span class="r-sv mock-badge" style="color:#00e676;border-color:rgba(0,230,118,.3)">DIJKSTRA · LIVE</span>
         </div>
       </div>`;
+
 
     document.getElementById('btn-send').disabled = false;
     document.getElementById('sb-delay').textContent = `${cost} units`;

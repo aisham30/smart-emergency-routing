@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Smart Emergency Routing — Control Dashboard</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+  <!-- ── HEADER ──────────────────────────────────────────────────────────── -->
+  <header class="header">
+    <div class="header-brand">
+      <div class="header-icon">⚡</div>
+      <div>
+        <div class="header-title">SMART EMERGENCY ROUTING SYSTEM</div>
+        <div class="header-sub">Dijkstra Network Dispatch · 8-Node Urban Emergency Network · v0.1-frontend</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="status-badge status-online" id="net-status-badge">
+        <span class="status-dot"></span>
+        <span id="net-status-text">NETWORK ONLINE</span>
+      </div>
+      <div class="clock" id="clock">00:00:00</div>
+    </div>
+  </header>
+
+  <!-- ── MAIN ────────────────────────────────────────────────────────────── -->
+  <main class="main">
+
+    <!-- Left sidebar: dispatch controls + node list -->
+    <aside class="panel panel-left">
+
+      <div class="section">
+        <div class="sec-title">Dispatch Controls</div>
+
+        <div class="field">
+          <label class="field-label">SOURCE NODE</label>
+          <select id="sel-source"></select>
+        </div>
+        <div class="field">
+          <label class="field-label">DESTINATION NODE</label>
+          <select id="sel-dest"></select>
+        </div>
+
+        <button class="btn btn-primary" id="btn-find">
+          <span>⚡</span> FIND SHORTEST ROUTE
+        </button>
+        <button class="btn btn-ghost" id="btn-clear">
+          ✕ CLEAR ROUTE
+        </button>
+      </div>
+
+      <div class="section" style="flex:1; overflow:hidden; display:flex; flex-direction:column;">
+        <div class="sec-title">Network Nodes</div>
+        <div class="node-list" id="node-list" style="overflow-y:auto; flex:1;"></div>
+      </div>
+
+    </aside>
+
+    <!-- Centre: SVG network map -->
+    <div class="viz-wrap">
+      <div class="viz-toolbar">
+        <span class="viz-toolbar-title">EMERGENCY NETWORK MAP · REAL-TIME</span>
+        <span class="legend">
+          <span class="leg-item"><span class="leg-dot leg-src"></span>Source</span>
+          <span class="leg-item"><span class="leg-dot leg-dst"></span>Dest</span>
+          <span class="leg-item"><span class="leg-dot leg-rt"></span>Route</span>
+          <span class="leg-item"><span class="leg-dot leg-fail"></span>Failed</span>
+        </span>
+      </div>
+      <div class="svg-container">
+        <svg id="network-svg"
+             viewBox="0 0 900 510"
+             preserveAspectRatio="xMidYMid meet"
+             role="img"
+             aria-label="Emergency network graph">
+        </svg>
+      </div>
+    </div>
+
+    <!-- Right sidebar: route details + emergency message -->
+    <aside class="panel panel-right">
+
+      <div class="section">
+        <div class="sec-title">Route Details</div>
+        <div id="route-panel">
+          <p class="r-empty">
+            Select source &amp; destination,<br>
+            then click <strong>FIND SHORTEST ROUTE</strong>
+          </p>
+        </div>
+      </div>
+
+      <div class="section" style="flex:1; display:flex; flex-direction:column; gap:10px;">
+        <div class="sec-title">Emergency Message</div>
+
+        <div class="msg-compose">
+          <div class="field">
+            <label class="field-label">MESSAGE</label>
+            <textarea id="msg-input"
+                      rows="3"
+                      placeholder="Enter emergency dispatch message…"
+                      maxlength="200"></textarea>
+          </div>
+          <button class="btn btn-send" id="btn-send" disabled>
+            <span>📡</span> SEND EMERGENCY BROADCAST
+          </button>
+        </div>
+
+        <div class="msg-log">
+          <div class="log-hdr">TRANSMISSION LOG</div>
+          <div id="log-entries"></div>
+        </div>
+      </div>
+
+    </aside>
+  </main>
+
+  <!-- ── STATUS BAR ───────────────────────────────────────────────────────── -->
+  <footer class="footer">
+    <div class="sb-item">
+      <span class="sb-label">TOTAL DELAY</span>
+      <span class="sb-value" id="sb-delay">—</span>
+    </div>
+    <div class="sb-item">
+      <span class="sb-label">HOPS</span>
+      <span class="sb-value" id="sb-hops">—</span>
+    </div>
+    <div class="sb-item">
+      <span class="sb-label">ACTIVE NODES</span>
+      <span class="sb-value" id="sb-nodes">8 / 8</span>
+    </div>
+    <div class="sb-item">
+      <span class="sb-label">ACTIVE EDGES</span>
+      <span class="sb-value" id="sb-edges">12 / 12</span>
+    </div>
+    <div class="sb-item">
+      <span class="sb-label">ALGORITHM</span>
+      <span class="sb-value algo-pill">MOCK · DIJKSTRA READY</span>
+    </div>
+    <div class="sb-sep"></div>
+    <div class="footer-credit">Smart Emergency Routing · Frontend Module</div>
+  </footer>
+
+  <!-- ES module entry point -->
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

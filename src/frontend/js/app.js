@@ -194,9 +194,10 @@ class App {
     this.viz.setNodeState(id, 'failed');
     this.ui.updateNodeTag(id, 'failed');
     this.#updateNetworkStats();
+    this.ui.updateIncidentAlert(this.sim.failedNodes, this.sim.failedLinks);
 
     if (this.state.currentRoute?.path.includes(id)) {
-      this.#attemptAutoReroute(`Node <strong>${id}</strong> failed`);
+      this.#attemptAutoReroute(`Node <strong>${id}</strong> collapsed`);
     }
   }
 
@@ -204,6 +205,7 @@ class App {
     this.viz.setNodeState(id, 'active');
     this.ui.updateNodeTag(id, 'active');
     this.#updateNetworkStats();
+    this.ui.updateIncidentAlert(this.sim.failedNodes, this.sim.failedLinks);
 
     if (this.state.source && this.state.destination) {
       this.#handleFindRoute(this.state.source, this.state.destination);
@@ -213,6 +215,7 @@ class App {
   #onLinkFail(u, v) {
     this.viz.setLinkState(u, v, 'failed');
     this.#updateNetworkStats();
+    this.ui.updateIncidentAlert(this.sim.failedNodes, this.sim.failedLinks);
 
     const path = this.state.currentRoute?.path;
     if (path) {
@@ -220,13 +223,14 @@ class App {
         i < path.length - 1 &&
         ((path[i] === u && path[i + 1] === v) || (path[i] === v && path[i + 1] === u))
       );
-      if (affected) this.#attemptAutoReroute(`Link <strong>${u}↔${v}</strong> failed`);
+      if (affected) this.#attemptAutoReroute(`Link <strong>${u}↔${v}</strong> severed`);
     }
   }
 
   #onLinkRestore(u, v) {
     this.viz.setLinkState(u, v, 'active');
     this.#updateNetworkStats();
+    this.ui.updateIncidentAlert(this.sim.failedNodes, this.sim.failedLinks);
 
     if (this.state.source && this.state.destination) {
       this.#handleFindRoute(this.state.source, this.state.destination);
@@ -237,6 +241,7 @@ class App {
     this.viz.restoreAll();
     this.ui.resetAllNodes();
     this.#updateNetworkStats();
+    this.ui.updateIncidentAlert(this.sim.failedNodes, this.sim.failedLinks);
 
     if (this.state.source && this.state.destination) {
       this.#handleFindRoute(this.state.source, this.state.destination);
@@ -260,7 +265,11 @@ class App {
     if (reRoute.status === 'unreachable') {
       this.viz.clearRoute();
       this.state.currentRoute = null;
-      this.ui.showError(`${failureReason} — <strong>${this.state.destination}</strong> is now unreachable. All routes severed.`);
+      this.ui.showError(`${failureReason} — <strong>${this.state.destination}</strong> is now unreachable. All connecting routes severed.`);
+      this.ui.updateIncidentAlert(this.sim.failedNodes, this.sim.failedLinks, {
+        unreachable: true,
+        target: this.state.destination
+      });
     } else {
       const newRoute = {
         path: reRoute.path,
@@ -269,7 +278,17 @@ class App {
       };
       this.state.currentRoute = newRoute;
       this.viz.highlightRoute(newRoute.path);
-      this.ui.showRoute(newRoute);
+      const rerouteInfo = {
+        reason: failureReason,
+        prevPath,
+        prevCost,
+        delayDelta: reRoute.delayDelta
+      };
+      this.ui.showRoute(newRoute, rerouteInfo);
+      this.ui.updateIncidentAlert(this.sim.failedNodes, this.sim.failedLinks, {
+        rerouted: true,
+        delayDelta: reRoute.delayDelta
+      });
     }
   }
 

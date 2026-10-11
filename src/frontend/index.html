@@ -112,18 +112,24 @@
         <button class="quick-btn" id="btn-scen-2">
           SCENARIO 2: ALTERNATE (CC→R2)
         </button>
-        <button class="quick-btn" id="btn-scen-3">
-          SCENARIO 3: LINK FAIL (CC↔N1)
+        <button class="quick-btn" id="btn-scen-3" style="color:#ffb547; border-color:rgba(255,181,71,0.4);">
+          ⚡ FAIL LINK (CC↔N1) & REROUTE
         </button>
-        <button class="quick-btn" id="btn-scen-4">
-          SCENARIO 4: NODE COLLAPSE (N1)
+        <button class="quick-btn" id="btn-scen-4" style="color:#ff7070; border-color:rgba(255,59,59,0.4);">
+          ⚡ COLLAPSE NODE (N1) & BYPASS
         </button>
-        <button class="quick-btn" id="btn-scen-5">
-          SCENARIO 5: ISOLATION (R2)
+        <button class="quick-btn" id="btn-scen-5" style="color:#ff3b3b; border-color:rgba(255,59,59,0.6);">
+          ⚡ ISOLATE R2 (UNREACHABLE)
         </button>
         <button class="quick-btn" id="btn-scen-restore">
-          ↺ RESTORE ALL
+          ↺ RESTORE ALL (100% HEALTH)
         </button>
+      </div>
+
+      <!-- Real-Time Network Failure & Incident Alert Banner -->
+      <div class="incident-banner incident-banner--healthy" id="incident-banner">
+        <span class="incident-icon" id="incident-icon">✅</span>
+        <span class="incident-text" id="incident-text">NETWORK INFRASTRUCTURE 100% HEALTHY · 8/8 NODES · 12/12 LINKS OPERATIONAL</span>
       </div>
 
       <div class="svg-container">

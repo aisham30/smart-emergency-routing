@@ -99,6 +99,15 @@ export class NetworkVisualizer {
     af.appendChild(ab); af.appendChild(am);
     defs.appendChild(af);
 
+    // Red glow filter (failure alert)
+    const rf = el('filter', { id: 'glow-red', x: '-40%', y: '-40%', width: '180%', height: '180%' });
+    const rb = el('feGaussianBlur', { in: 'SourceGraphic', stdDeviation: 4, result: 'blur' });
+    const rm = el('feMerge');
+    rm.appendChild(el('feMergeNode', { in: 'blur' }));
+    rm.appendChild(el('feMergeNode', { in: 'SourceGraphic' }));
+    rf.appendChild(rb); rf.appendChild(rm);
+    defs.appendChild(rf);
+
     this.svg.appendChild(defs);
 
     // ② Background
@@ -380,10 +389,10 @@ export class NetworkVisualizer {
       circle.setAttribute('stroke', '#ff3b3b');
       circle.setAttribute('stroke-width', 2);
       circle.setAttribute('stroke-dasharray', '4 3');
-      circle.style.filter = '';
-      circle.setAttribute('opacity', '0.6');
+      circle.setAttribute('filter', 'url(#glow-red)');
+      circle.setAttribute('opacity', '0.75');
       ring.setAttribute('stroke', '#ff3b3b');
-      ring.setAttribute('opacity', '0.3');
+      ring.setAttribute('opacity', '0.4');
       idLabel.setAttribute('fill', '#5a2020');
       nameLabel.setAttribute('fill', '#5a2020');
       failX.setAttribute('display', 'block');
@@ -393,6 +402,8 @@ export class NetworkVisualizer {
       circle.setAttribute('stroke', info.color);
       circle.setAttribute('stroke-width', 2.5);
       circle.removeAttribute('stroke-dasharray');
+      circle.removeAttribute('filter');
+      circle.style.filter = '';
       circle.setAttribute('opacity', '1');
       ring.setAttribute('stroke', info.color);
       ring.setAttribute('opacity', '0.2');
@@ -416,8 +427,8 @@ export class NetworkVisualizer {
       edgeObj.line.setAttribute('stroke', '#ff3b3b');
       edgeObj.line.setAttribute('stroke-width', '2.5');
       edgeObj.line.setAttribute('stroke-dasharray', '6 4');
+      edgeObj.line.setAttribute('filter', 'url(#glow-red)');
       edgeObj.line.style.animation = '';
-      edgeObj.line.removeAttribute('filter');
       edgeObj.wbg.setAttribute('fill', '#260000');
       edgeObj.wbg.setAttribute('stroke', '#ff3b3b');
       edgeObj.wlabel.setAttribute('fill', '#ff5252');
@@ -427,6 +438,7 @@ export class NetworkVisualizer {
       edgeObj.line.setAttribute('stroke', '#1a3050');
       edgeObj.line.setAttribute('stroke-width', '2');
       edgeObj.line.removeAttribute('stroke-dasharray');
+      edgeObj.line.removeAttribute('filter');
       edgeObj.wbg.setAttribute('fill', '#06101e');
       edgeObj.wbg.setAttribute('stroke', '#0f2040');
       edgeObj.wlabel.setAttribute('fill', '#2e5070');

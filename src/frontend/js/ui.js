@@ -271,7 +271,7 @@ export class UIController {
 
   // ── Route detail panel ─────────────────────────────────────────────────────
 
-  showRoute(route) {
+  showRoute(route, rerouteInfo = null) {
     const { path, cost, hops } = route;
     const q = qualityFor(cost);
 
@@ -280,6 +280,20 @@ export class UIController {
       const chip = `<span class="r-chip" style="background:${c}1a;border:1px solid ${c};color:${c}">${n}</span>`;
       return i < path.length - 1 ? chip + `<span class="r-arrow">→</span>` : chip;
     }).join('');
+
+    const rerouteHtml = rerouteInfo ? `
+      <div class="reroute-card">
+        <div class="reroute-hdr">
+          <span class="reroute-badge">INCIDENT DETOUR</span>
+          <span>AUTOMATIC BYPASS ACTIVATED</span>
+        </div>
+        <div class="reroute-detail">
+          <strong>Incident:</strong> ${rerouteInfo.reason}<br>
+          ${rerouteInfo.prevPath ? `<strong>Broken Route:</strong> ${rerouteInfo.prevPath.join(' → ')} (${rerouteInfo.prevCost} ms)<br>` : ''}
+          <strong>New Bypass:</strong> ${path.join(' → ')} (${cost} ms)<br>
+          <span class="reroute-delta">Latency Impact: +${rerouteInfo.delayDelta} ms delay penalty</span>
+        </div>
+      </div>` : '';
 
     document.getElementById('route-panel').innerHTML = `
       <div class="r-path">${chips}</div>
@@ -300,7 +314,8 @@ export class UIController {
           <span class="r-sl">ALGORITHM EXECUTION</span>
           <span class="r-sv mock-badge" style="color:#00e676;border-color:rgba(0,230,118,.3)">DIJKSTRA · DYNAMIC LIVE</span>
         </div>
-      </div>`;
+      </div>
+      ${rerouteHtml}`;
 
     document.getElementById('btn-send').disabled = false;
     document.getElementById('sb-delay').textContent = `${cost} ms`;
@@ -321,6 +336,45 @@ export class UIController {
     document.getElementById('btn-send').disabled = true;
     document.getElementById('sb-delay').textContent = '—';
     document.getElementById('sb-hops').textContent  = '—';
+  }
+
+  // ── Network Incident Alert Banner ──────────────────────────────────────────
+
+  updateIncidentAlert(failedNodes, failedLinks, incidentDetails = null) {
+    const banner = document.getElementById('incident-banner');
+    const iconEl = document.getElementById('incident-icon');
+    const textEl = document.getElementById('incident-text');
+    if (!banner || !iconEl || !textEl) return;
+
+    const nodeCount = failedNodes.size;
+    const linkCount = failedLinks.size;
+
+    if (nodeCount === 0 && linkCount === 0) {
+      banner.className = 'incident-banner incident-banner--healthy';
+      iconEl.textContent = '✅';
+      textEl.textContent = 'NETWORK INFRASTRUCTURE 100% HEALTHY · 8/8 NODES · 12/12 LINKS OPERATIONAL';
+      return;
+    }
+
+    banner.className = 'incident-banner incident-banner--active';
+    iconEl.textContent = '🚨';
+
+    const parts = [];
+    if (nodeCount > 0) {
+      parts.push(`Collapsed Nodes: [${Array.from(failedNodes).join(', ')}]`);
+    }
+    if (linkCount > 0) {
+      const formattedLinks = Array.from(failedLinks).map(k => k.replace('<->', '↔'));
+      parts.push(`Severed Links: [${formattedLinks.join(', ')}]`);
+    }
+
+    if (incidentDetails?.unreachable) {
+      textEl.innerHTML = `SEVERE DISASTER: Destination <strong>${incidentDetails.target}</strong> is ISOLATED! ${parts.join(' · ')} · Delay: ∞`;
+    } else if (incidentDetails?.rerouted) {
+      textEl.innerHTML = `OUTAGE DETECTED: ${parts.join(' · ')} · ⚡ Rerouted via bypass (+${incidentDetails.delayDelta}ms delta)`;
+    } else {
+      textEl.innerHTML = `ACTIVE INCIDENT: ${parts.join(' · ')} · Dynamic topology degraded`;
+    }
   }
 
   // ── Test Suite Results Rendering ───────────────────────────────────────────

@@ -3,16 +3,15 @@
  *
  * Manages all DOM interactions outside the SVG canvas:
  *   • Source / destination selector dropdowns
- *   • Node status sidebar list with colour-coded indicators
+ *   • Node status sidebar list with colour-coded indicators & interactive toggles
+ *   • Simulation fault injection controls (node/link failure & restore)
  *   • Route detail panel (path chips, cost, hops, quality badge)
  *   • Emergency message compose area + transmission log
- *   • Status bar metric updates
- *   • Live clock
- *
- * Accepts callback hooks for all user actions — zero routing logic here.
+ *   • Interactive Scenario Presets & In-Browser Test Suite Runner
+ *   • Status bar metric updates & Live clock
  */
 
-import { NODE_INFO, NODE_TYPES } from './network.js';
+import { NODE_INFO, NODE_TYPES, EDGES } from './network.js';
 
 // Route quality thresholds
 const QUALITY = [
@@ -28,26 +27,62 @@ function qualityFor(cost) {
 
 export class UIController {
   /**
-   * @param {{ onFindRoute, onClearRoute, onNodeClick, onSendMessage }} callbacks
+   * @param {{ onFindRoute, onClearRoute, onNodeClick, onSendMessage, onToggleNodeFail, onToggleLinkFail, onRestoreAll, onRunTestSuite, onRunScenarioPreset }} callbacks
    */
-  constructor({ onFindRoute, onClearRoute, onNodeClick, onSendMessage }) {
-    this._cb = { onFindRoute, onClearRoute, onNodeClick, onSendMessage };
+  constructor({
+    onFindRoute,
+    onClearRoute,
+    onNodeClick,
+    onSendMessage,
+    onToggleNodeFail,
+    onToggleLinkFail,
+    onRestoreAll,
+    onRunTestSuite,
+    onRunScenarioPreset
+  }) {
+    this._cb = {
+      onFindRoute,
+      onClearRoute,
+      onNodeClick,
+      onSendMessage,
+      onToggleNodeFail,
+      onToggleLinkFail,
+      onRestoreAll,
+      onRunTestSuite,
+      onRunScenarioPreset
+    };
     this._logCount = 0;
 
     this.#populateSelects();
     this.#buildNodeList();
     this.#wireButtons();
+    this.#wireTabs();
     this.#startClock();
   }
 
-  // ── Getters ────────────────────────────────────────────────────────────────
+  // ── Getters & Setters ──────────────────────────────────────────────────────
 
   getSource() { return document.getElementById('sel-source').value; }
   getDest()   { return document.getElementById('sel-dest').value;   }
 
+  setSource(id) {
+    const sel = document.getElementById('sel-source');
+    if (sel) sel.value = id;
+  }
+
   setDest(id) {
     const sel = document.getElementById('sel-dest');
     if (sel) sel.value = id;
+  }
+
+  getSelectedFaultNode() {
+    return document.getElementById('sel-fault-node').value;
+  }
+
+  getSelectedFaultLink() {
+    const val = document.getElementById('sel-fault-link').value;
+    const [u, v] = val.split('·');
+    return { u, v };
   }
 
   // ── Dropdowns ──────────────────────────────────────────────────────────────
@@ -55,15 +90,31 @@ export class UIController {
   #populateSelects() {
     const src = document.getElementById('sel-source');
     const dst = document.getElementById('sel-dest');
+    const faultNode = document.getElementById('sel-fault-node');
+    const faultLink = document.getElementById('sel-fault-link');
+
+    src.innerHTML = '';
+    dst.innerHTML = '';
+    if (faultNode) faultNode.innerHTML = '';
+    if (faultLink) faultLink.innerHTML = '';
 
     for (const [id, info] of Object.entries(NODE_INFO)) {
       const icon = NODE_TYPES[info.type]?.icon ?? '●';
       src.appendChild(new Option(`${icon} ${id}  —  ${info.label}`, id));
       dst.appendChild(new Option(`${icon} ${id}  —  ${info.label}`, id));
+      if (faultNode) faultNode.appendChild(new Option(`${icon} ${id} (${info.label})`, id));
+    }
+
+    if (faultLink) {
+      for (const edge of EDGES) {
+        const key = `${edge.from}·${edge.to}`;
+        faultLink.appendChild(new Option(`${edge.from} ↔ ${edge.to} (${edge.weight}ms)`, key));
+      }
     }
 
     src.value = 'CC';
     dst.value = 'H1';
+    if (faultNode) faultNode.value = 'N1';
   }
 
   // ── Node status sidebar ────────────────────────────────────────────────────
@@ -90,6 +141,13 @@ export class UIController {
       tag.className = 'ni-tag ni-active';
       tag.dataset.tagFor = id;
       tag.textContent = 'ACTIVE';
+      tag.title = `Click to toggle failure on node ${id}`;
+
+      // Clicking tag toggles failure directly!
+      tag.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this._cb.onToggleNodeFail?.(id);
+      });
 
       item.append(dot, text, tag);
       item.addEventListener('click', () => this._cb.onNodeClick?.(id));
@@ -114,24 +172,100 @@ export class UIController {
     if (item) item.style.setProperty('--nc', state === 'failed' ? '#ff3b3b' : NODE_INFO[id].color);
   }
 
-  // ── Buttons ────────────────────────────────────────────────────────────────
+  resetAllNodes() {
+    for (const id of Object.keys(NODE_INFO)) {
+      this.updateNodeTag(id, 'active');
+    }
+  }
+
+  // ── Buttons & Preset Wiring ────────────────────────────────────────────────
 
   #wireButtons() {
-    document.getElementById('btn-find').addEventListener('click', () => {
+    document.getElementById('btn-find')?.addEventListener('click', () => {
       const src = this.getSource(), dst = this.getDest();
       if (src === dst) { this.showError('Source and destination must be different nodes.'); return; }
       this._cb.onFindRoute?.(src, dst);
     });
 
-    document.getElementById('btn-clear').addEventListener('click', () => {
+    document.getElementById('btn-clear')?.addEventListener('click', () => {
       this._cb.onClearRoute?.();
       this.clearRoutePanel();
     });
 
-    document.getElementById('btn-send').addEventListener('click', () => {
+    document.getElementById('btn-send')?.addEventListener('click', () => {
       const msg = document.getElementById('msg-input').value.trim();
       if (!msg) return;
       this._cb.onSendMessage?.(msg);
+    });
+
+    // Fault Injection buttons
+    document.getElementById('btn-toggle-node')?.addEventListener('click', () => {
+      const node = this.getSelectedFaultNode();
+      this._cb.onToggleNodeFail?.(node);
+    });
+
+    document.getElementById('btn-toggle-link')?.addEventListener('click', () => {
+      const { u, v } = this.getSelectedFaultLink();
+      this._cb.onToggleLinkFail?.(u, v);
+    });
+
+    document.getElementById('btn-restore-all')?.addEventListener('click', () => {
+      this._cb.onRestoreAll?.();
+    });
+
+    // Quick presets bar
+    document.getElementById('btn-run-tests')?.addEventListener('click', () => {
+      this.switchTab('tab-tests');
+      this._cb.onRunTestSuite?.();
+    });
+
+    document.getElementById('btn-run-tests-panel')?.addEventListener('click', () => {
+      this._cb.onRunTestSuite?.();
+    });
+
+    document.getElementById('btn-scen-1')?.addEventListener('click', () => {
+      this._cb.onRunScenarioPreset?.(1);
+    });
+
+    document.getElementById('btn-scen-2')?.addEventListener('click', () => {
+      this._cb.onRunScenarioPreset?.(2);
+    });
+
+    document.getElementById('btn-scen-3')?.addEventListener('click', () => {
+      this._cb.onRunScenarioPreset?.(3);
+    });
+
+    document.getElementById('btn-scen-4')?.addEventListener('click', () => {
+      this._cb.onRunScenarioPreset?.(4);
+    });
+
+    document.getElementById('btn-scen-5')?.addEventListener('click', () => {
+      this._cb.onRunScenarioPreset?.(5);
+    });
+
+    document.getElementById('btn-scen-restore')?.addEventListener('click', () => {
+      this._cb.onRestoreAll?.();
+    });
+  }
+
+  // ── Tabs ───────────────────────────────────────────────────────────────────
+
+  #wireTabs() {
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    tabBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const target = btn.dataset.tab;
+        this.switchTab(target);
+      });
+    });
+  }
+
+  switchTab(tabId) {
+    document.querySelectorAll('.tab-btn').forEach(b => {
+      b.classList.toggle('tab-btn--active', b.dataset.tab === tabId);
+    });
+    document.querySelectorAll('.tab-pane').forEach(p => {
+      p.classList.toggle('tab-pane--active', p.id === tabId);
     });
   }
 
@@ -152,7 +286,7 @@ export class UIController {
       <div class="r-stats">
         <div class="r-stat">
           <span class="r-sl">TOTAL DELAY</span>
-          <span class="r-sv" style="color:#00e676">${cost} <small>units</small></span>
+          <span class="r-sv" style="color:#00e676">${cost} <small>ms</small></span>
         </div>
         <div class="r-stat">
           <span class="r-sl">HOPS</span>
@@ -163,20 +297,22 @@ export class UIController {
           <span class="r-sv" style="color:${q.color};font-size:0.75rem">${q.label}</span>
         </div>
         <div class="r-stat r-stat--full">
-          <span class="r-sl">DATA SOURCE</span>
-          <span class="r-sv mock-badge" style="color:#00e676;border-color:rgba(0,230,118,.3)">DIJKSTRA · LIVE</span>
+          <span class="r-sl">ALGORITHM EXECUTION</span>
+          <span class="r-sv mock-badge" style="color:#00e676;border-color:rgba(0,230,118,.3)">DIJKSTRA · DYNAMIC LIVE</span>
         </div>
       </div>`;
 
-
     document.getElementById('btn-send').disabled = false;
-    document.getElementById('sb-delay').textContent = `${cost} units`;
+    document.getElementById('sb-delay').textContent = `${cost} ms`;
     document.getElementById('sb-hops').textContent  = hops;
   }
 
   showError(msg) {
     document.getElementById('route-panel').innerHTML =
       `<p class="r-empty r-error">${msg}</p>`;
+    document.getElementById('btn-send').disabled = true;
+    document.getElementById('sb-delay').textContent = '∞';
+    document.getElementById('sb-hops').textContent  = '—';
   }
 
   clearRoutePanel() {
@@ -187,11 +323,34 @@ export class UIController {
     document.getElementById('sb-hops').textContent  = '—';
   }
 
+  // ── Test Suite Results Rendering ───────────────────────────────────────────
+
+  renderTestResults(suite) {
+    const summaryText = document.getElementById('test-summary-text');
+    const listEl = document.getElementById('test-suite-list');
+
+    if (summaryText) {
+      summaryText.textContent = `${suite.totalPass} / ${suite.totalTests} CHECKS PASSED ✓`;
+      summaryText.style.color = suite.totalFail === 0 ? 'var(--green)' : 'var(--red)';
+    }
+
+    if (listEl) {
+      listEl.innerHTML = '';
+      for (const item of suite.checks) {
+        const div = document.createElement('div');
+        div.className = `test-item ${item.pass ? 'test-item--pass' : 'test-item--fail'}`;
+        div.innerHTML = `
+          <span class="test-item-icon">${item.pass ? '✓' : '✗'}</span>
+          <span class="test-item-sc">[SC${item.scenario}]</span>
+          <span class="test-item-lbl">${item.label}</span>
+        `;
+        listEl.appendChild(div);
+      }
+    }
+  }
+
   // ── Emergency message log ──────────────────────────────────────────────────
 
-  /**
-   * Adds a SENDING entry and returns the DOM element for later status update.
-   */
   addLogEntry({ time, path, cost, msg }) {
     const log = document.getElementById('log-entries');
     const entry = document.createElement('div');
@@ -199,7 +358,7 @@ export class UIController {
     entry.innerHTML =
       `<span class="log-ts">[${time}]</span> ` +
       `<span class="log-path">${path.join(' → ')}</span> ` +
-      `<span class="log-cost">(${cost}u)</span> — ${msg}`;
+      `<span class="log-cost">(${cost}ms)</span> — ${msg}`;
     log.prepend(entry);
     return entry;
   }
@@ -233,7 +392,7 @@ export class UIController {
 
     const badge = document.getElementById('net-status-badge');
     const text  = document.getElementById('net-status-text');
-    const isHealthy = activeNodes === totalNodes;
+    const isHealthy = activeNodes === totalNodes && activeEdges === totalEdges;
     badge.className = `status-badge ${isHealthy ? 'status-online' : 'status-degraded'}`;
     text.textContent = isHealthy ? 'NETWORK ONLINE' : 'NETWORK DEGRADED';
   }

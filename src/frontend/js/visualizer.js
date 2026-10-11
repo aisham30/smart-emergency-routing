@@ -62,9 +62,10 @@ export class NetworkVisualizer {
     this.edges    = edges;
 
     // Element registries
-    this._edgeEls = {};   // canonical key → { line, wbg, wlabel }
+    this._edgeEls = {};   // canonical key → { line, wbg, wlabel, weight, from, to, key }
     this._nodeEls = {};   // id → { g, circle, ring, failIcon }
     this._nodeStates = Object.fromEntries(Object.keys(nodeInfo).map(k => [k, 'active']));
+    this._failedEdges = new Set();
     this._activeRoute = [];
 
     this.#buildLayers();
@@ -141,12 +142,14 @@ export class NetworkVisualizer {
         x1: a.x, y1: a.y, x2: b.x, y2: b.y,
         stroke: '#1a3050', 'stroke-width': 2,
         'stroke-linecap': 'round',
+        cursor: 'pointer',
       });
 
       const wbg = el('rect', {
         class: 'e-wbg',
         x: mid.x - 11, y: mid.y - 9, width: 22, height: 16, rx: 3,
         fill: '#06101e', stroke: '#0f2040', 'stroke-width': 1,
+        cursor: 'pointer',
       });
 
       const wlabel = el('text', {
@@ -155,14 +158,22 @@ export class NetworkVisualizer {
         fill: '#2e5070',
         'font-size': 10, 'font-family': "'Courier New', monospace",
         'text-anchor': 'middle', 'dominant-baseline': 'central',
+        cursor: 'pointer',
       }, String(weight));
+
+      const handleLinkClick = () => {
+        this.svg.dispatchEvent(new CustomEvent('link-click', { detail: { u: from, v: to }, bubbles: true }));
+      };
+      line.addEventListener('click', handleLinkClick);
+      wbg.addEventListener('click', handleLinkClick);
+      wlabel.addEventListener('click', handleLinkClick);
 
       this._lgEdge.appendChild(line);
       this._lgEdge.appendChild(wbg);
       this._lgEdge.appendChild(wlabel);
 
       // Register under both directions for highlight lookup
-      const edgeObj = { line, wbg, wlabel };
+      const edgeObj = { line, wbg, wlabel, weight, from, to, key };
       this._edgeEls[key] = edgeObj;
       this._edgeEls[`${from}·${to}`] = edgeObj;
       this._edgeEls[`${to}·${from}`] = edgeObj;
@@ -268,8 +279,9 @@ export class NetworkVisualizer {
     this.clearRoute(false); // clear visual but keep source/dest markers
     this._activeRoute = path;
 
-    // Dim all edges first
-    for (const { line, wlabel } of Object.values(this._edgeEls)) {
+    // Dim all non-failed edges first
+    for (const [key, { line, wlabel }] of Object.entries(this._edgeEls)) {
+      if (this._failedEdges.has(key)) continue;
       line.setAttribute('stroke', '#0d2035');
       line.setAttribute('stroke-width', 1.5);
       wlabel.setAttribute('fill', '#162840');
@@ -279,7 +291,7 @@ export class NetworkVisualizer {
     for (let i = 0; i < path.length - 1; i++) {
       const eKey = [path[i], path[i + 1]].sort().join('·');
       const edgeObj = this._edgeEls[eKey];
-      if (!edgeObj) continue;
+      if (!edgeObj || this._failedEdges.has(eKey)) continue;
 
       edgeObj.line.setAttribute('stroke', '#00e676');
       edgeObj.line.setAttribute('stroke-width', 3.5);
@@ -293,6 +305,7 @@ export class NetworkVisualizer {
 
     // Highlight nodes on path
     for (const id of path) {
+      if (this._nodeStates[id] === 'failed') continue;
       const { circle, ring } = this._nodeEls[id];
       circle.setAttribute('stroke-width', 3.5);
       circle.style.filter = `drop-shadow(0 0 12px ${this.nodeInfo[id].color})`;
@@ -306,6 +319,7 @@ export class NetworkVisualizer {
 
     // Restore nodes
     for (const [id, { circle, ring }] of Object.entries(this._nodeEls)) {
+      if (this._nodeStates[id] === 'failed') continue;
       circle.setAttribute('stroke-width', 2.5);
       circle.style.filter = '';
       ring.setAttribute('opacity', '0.2');
@@ -314,16 +328,18 @@ export class NetworkVisualizer {
     }
 
     if (restoreEdges) {
-      // Restore all edges
-      for (const { line, wbg, wlabel } of Object.values(this._edgeEls)) {
-        line.setAttribute('stroke', '#1a3050');
-        line.setAttribute('stroke-width', 2);
-        line.removeAttribute('stroke-dasharray');
-        line.removeAttribute('filter');
-        line.style.animation = '';
-        wbg.setAttribute('fill', '#06101e');
-        wbg.setAttribute('stroke', '#0f2040');
-        wlabel.setAttribute('fill', '#2e5070');
+      // Restore non-failed edges
+      for (const [key, edgeObj] of Object.entries(this._edgeEls)) {
+        if (this._failedEdges.has(key)) continue;
+        edgeObj.line.setAttribute('stroke', '#1a3050');
+        edgeObj.line.setAttribute('stroke-width', 2);
+        edgeObj.line.removeAttribute('stroke-dasharray');
+        edgeObj.line.removeAttribute('filter');
+        edgeObj.line.style.animation = '';
+        edgeObj.wbg.setAttribute('fill', '#06101e');
+        edgeObj.wbg.setAttribute('stroke', '#0f2040');
+        edgeObj.wlabel.setAttribute('fill', '#2e5070');
+        edgeObj.wlabel.textContent = String(edgeObj.weight);
       }
     }
   }
@@ -348,14 +364,11 @@ export class NetworkVisualizer {
     ring.setAttribute('opacity', '0.5');
   }
 
-  // ── Public: node state ─────────────────────────────────────────────────────
+  // ── Public: node & link states ─────────────────────────────────────────────
 
   /**
    * setNodeState(id, state)
-   *
-   * INTEGRATION POINT (Alston — failure simulation):
-   *   Call this from src/simulation/ to toggle node failure visuals.
-   *   The routing module should then re-run on the modified graph.
+   * Toggle node failure visuals.
    */
   setNodeState(id, state) {
     this._nodeStates[id] = state;
@@ -387,6 +400,65 @@ export class NetworkVisualizer {
       nameLabel.setAttribute('fill', '#3a5878');
       failX.setAttribute('display', 'none');
     }
+  }
+
+  /**
+   * setLinkState(u, v, state)
+   * Toggle link failure visuals.
+   */
+  setLinkState(u, v, state) {
+    const key = [u, v].sort().join('·');
+    const edgeObj = this._edgeEls[key];
+    if (!edgeObj) return;
+
+    if (state === 'failed') {
+      this._failedEdges.add(key);
+      edgeObj.line.setAttribute('stroke', '#ff3b3b');
+      edgeObj.line.setAttribute('stroke-width', '2.5');
+      edgeObj.line.setAttribute('stroke-dasharray', '6 4');
+      edgeObj.line.style.animation = '';
+      edgeObj.line.removeAttribute('filter');
+      edgeObj.wbg.setAttribute('fill', '#260000');
+      edgeObj.wbg.setAttribute('stroke', '#ff3b3b');
+      edgeObj.wlabel.setAttribute('fill', '#ff5252');
+      edgeObj.wlabel.textContent = '✕';
+    } else {
+      this._failedEdges.delete(key);
+      edgeObj.line.setAttribute('stroke', '#1a3050');
+      edgeObj.line.setAttribute('stroke-width', '2');
+      edgeObj.line.removeAttribute('stroke-dasharray');
+      edgeObj.wbg.setAttribute('fill', '#06101e');
+      edgeObj.wbg.setAttribute('stroke', '#0f2040');
+      edgeObj.wlabel.setAttribute('fill', '#2e5070');
+      edgeObj.wlabel.textContent = String(edgeObj.weight);
+    }
+  }
+
+  /**
+   * restoreAll()
+   * Resets all nodes and links back to active baseline.
+   */
+  restoreAll() {
+    this._failedEdges.clear();
+    for (const id of Object.keys(this.nodeInfo)) {
+      this.setNodeState(id, 'active');
+    }
+    for (const { from, to, weight } of this.edges) {
+      const key = [from, to].sort().join('·');
+      const edgeObj = this._edgeEls[key];
+      if (edgeObj) {
+        edgeObj.line.setAttribute('stroke', '#1a3050');
+        edgeObj.line.setAttribute('stroke-width', '2');
+        edgeObj.line.removeAttribute('stroke-dasharray');
+        edgeObj.line.removeAttribute('filter');
+        edgeObj.line.style.animation = '';
+        edgeObj.wbg.setAttribute('fill', '#06101e');
+        edgeObj.wbg.setAttribute('stroke', '#0f2040');
+        edgeObj.wlabel.setAttribute('fill', '#2e5070');
+        edgeObj.wlabel.textContent = String(weight);
+      }
+    }
+    this.clearRoute(true);
   }
 
   getNodeState(id) { return this._nodeStates[id]; }

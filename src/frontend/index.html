@@ -30,7 +30,7 @@
   <!-- ── MAIN ────────────────────────────────────────────────────────────── -->
   <main class="main">
 
-    <!-- Left sidebar: dispatch controls + node list -->
+    <!-- Left sidebar: dispatch controls + fault injection + node list -->
     <aside class="panel panel-left">
 
       <div class="section">
@@ -53,8 +53,36 @@
         </button>
       </div>
 
+      <!-- Simulation Fault Injection Controls -->
+      <div class="section">
+        <div class="sec-title">Simulation Fault Controls</div>
+
+        <div class="field">
+          <label class="field-label">TARGET NODE</label>
+          <select id="sel-fault-node"></select>
+        </div>
+        <button class="btn btn-sm btn-fault" id="btn-toggle-node">
+          ⚡ TOGGLE NODE FAILURE
+        </button>
+
+        <div class="field" style="margin-top:6px;">
+          <label class="field-label">TARGET LINK</label>
+          <select id="sel-fault-link"></select>
+        </div>
+        <button class="btn btn-sm btn-fault" id="btn-toggle-link">
+          ⚡ TOGGLE LINK FAILURE
+        </button>
+
+        <button class="btn btn-sm btn-restore" id="btn-restore-all" style="margin-top:6px;">
+          ↺ RESTORE FULL NETWORK
+        </button>
+      </div>
+
       <div class="section" style="flex:1; overflow:hidden; display:flex; flex-direction:column;">
-        <div class="sec-title">Network Nodes</div>
+        <div class="sec-title" style="display:flex; justify-content:space-between; align-items:center;">
+          <span>Network Nodes</span>
+          <span style="font-size:0.5rem; color:var(--text-sec);">CLICK TAG TO TOGGLE</span>
+        </div>
         <div class="node-list" id="node-list" style="overflow-y:auto; flex:1;"></div>
       </div>
 
@@ -71,6 +99,33 @@
           <span class="leg-item"><span class="leg-dot leg-fail"></span>Failed</span>
         </span>
       </div>
+
+      <!-- Quick Scenario & Test Presets Bar -->
+      <div class="quick-bar">
+        <span class="quick-label">SIMULATION PRESETS:</span>
+        <button class="quick-btn quick-btn-highlight" id="btn-run-tests">
+          🧪 RUN ALL 8 TESTS
+        </button>
+        <button class="quick-btn" id="btn-scen-1">
+          SCENARIO 1: BASELINE (CC→H1)
+        </button>
+        <button class="quick-btn" id="btn-scen-2">
+          SCENARIO 2: ALTERNATE (CC→R2)
+        </button>
+        <button class="quick-btn" id="btn-scen-3">
+          SCENARIO 3: LINK FAIL (CC↔N1)
+        </button>
+        <button class="quick-btn" id="btn-scen-4">
+          SCENARIO 4: NODE COLLAPSE (N1)
+        </button>
+        <button class="quick-btn" id="btn-scen-5">
+          SCENARIO 5: ISOLATION (R2)
+        </button>
+        <button class="quick-btn" id="btn-scen-restore">
+          ↺ RESTORE ALL
+        </button>
+      </div>
+
       <div class="svg-container">
         <svg id="network-svg"
              viewBox="0 0 900 510"
@@ -81,7 +136,7 @@
       </div>
     </div>
 
-    <!-- Right sidebar: route details + emergency message -->
+    <!-- Right sidebar: route details + emergency message / test suite -->
     <aside class="panel panel-right">
 
       <div class="section">
@@ -94,26 +149,57 @@
         </div>
       </div>
 
-      <div class="section" style="flex:1; display:flex; flex-direction:column; gap:10px;">
-        <div class="sec-title">Emergency Message</div>
-
-        <div class="msg-compose">
-          <div class="field">
-            <label class="field-label">MESSAGE</label>
-            <textarea id="msg-input"
-                      rows="3"
-                      placeholder="Enter emergency dispatch message…"
-                      maxlength="200"></textarea>
-          </div>
-          <button class="btn btn-send" id="btn-send" disabled>
-            <span>📡</span> SEND EMERGENCY BROADCAST
+      <div class="section" style="flex:1; display:flex; flex-direction:column; min-height:0;">
+        <!-- Tab Bar -->
+        <div class="tab-bar">
+          <button class="tab-btn tab-btn--active" id="tab-btn-msg" data-tab="tab-msg">
+            📡 DISPATCH & LOG
+          </button>
+          <button class="tab-btn" id="tab-btn-tests" data-tab="tab-tests">
+            🧪 TEST & SCENARIOS
           </button>
         </div>
 
-        <div class="msg-log">
-          <div class="log-hdr">TRANSMISSION LOG</div>
-          <div id="log-entries"></div>
+        <!-- Tab 1: Dispatch & Message Log -->
+        <div class="tab-pane tab-pane--active" id="tab-msg">
+          <div class="msg-compose">
+            <div class="field">
+              <label class="field-label">MESSAGE</label>
+              <textarea id="msg-input"
+                        rows="3"
+                        placeholder="Enter emergency dispatch message…"
+                        maxlength="200"></textarea>
+            </div>
+            <button class="btn btn-send" id="btn-send" disabled>
+              <span>📡</span> SEND EMERGENCY BROADCAST
+            </button>
+          </div>
+
+          <div class="msg-log" style="flex:1;">
+            <div class="log-hdr">TRANSMISSION LOG</div>
+            <div id="log-entries"></div>
+          </div>
         </div>
+
+        <!-- Tab 2: Test Suite & Scenarios -->
+        <div class="tab-pane" id="tab-tests">
+          <div class="test-summary-card">
+            <div>
+              <div style="font-size:0.55rem; color:var(--text-sec); letter-spacing:1.5px;">AUTOMATED SUITE</div>
+              <div class="test-count" id="test-summary-text">Ready to run (8 Scenarios)</div>
+            </div>
+            <button class="btn btn-sm btn-primary" id="btn-run-tests-panel" style="width:auto; margin:0; padding:5px 8px;">
+              ▶ RUN
+            </button>
+          </div>
+
+          <div class="test-suite-list" id="test-suite-list">
+            <p class="r-empty" id="test-empty-msg">
+              Click <strong>▶ RUN</strong> to execute all 8 scenarios and verify Dijkstra, failure handling, and network recovery.
+            </p>
+          </div>
+        </div>
+
       </div>
 
     </aside>

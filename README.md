@@ -87,23 +87,31 @@ smart-emergency-routing/
 │   └── network.js      # 8-node network adjacency specification
 ├── tests/              # Unit & integration tests
 ├── docs/               # Design documents, diagrams, references
+├── USER_GUIDE.md   # Operator manual & dashboard walkthrough
 ├── README.md
 └── package.json
 ```
 
 ---
 
+## 📖 User Guide & Documentation
+
+For a step-by-step walkthrough of the interactive dashboard, fault injection tools, scenario presets, and test runner, see the **[User Guide](USER_GUIDE.md)**.
+
+---
+
 ## 🚀 Getting Started
 
 ```bash
-# Install dependencies
-npm install
-
-# Run tests
-npm test
-
-# Start development server (once frontend is scaffolded)
+# Start local dashboard server (served on port 8080)
 npm start
+# OR: python -m http.server 8080
+
+# Run all test suites
+npm run test:all
+
+# Run CLI failure & recovery demonstration
+npm run demo
 ```
 
 ---
